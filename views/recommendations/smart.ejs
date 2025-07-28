@@ -1,0 +1,32 @@
+<% layout("layouts/boilerplate") %>
+
+<style>
+  .smart-img {
+    height: 250px;
+    object-fit: cover;
+    width: 100%;
+    border-radius: 0.5rem;
+  }
+</style>
+
+<% if (Array.isArray(recommendations) && recommendations.length > 0) { %>
+  <div class="row row-cols-1 row-cols-md-3 g-4">
+    <% recommendations.forEach(listing => { %>
+      <div class="col">
+        <div class="card h-100 shadow-sm border-0">
+          <img src="<%= listing.image?.url || '/images/default.jpg' %>" class="card-img-top smart-img" alt="<%= listing.title %>">
+          <div class="card-body">
+            <h5 class="card-title"><%= listing.title %></h5>
+            <p class="card-text text-muted"><i class="bi bi-geo-alt"></i> <%= listing.location %></p>
+            <p class="card-text fw-bold">₹<%= listing.price %> / night</p>
+            <a href="/listings/<%= listing._id %>" class="btn btn-sm btn-primary">View Listing</a>
+          </div>
+        </div>
+      </div>
+    <% }); %>
+  </div>
+<% } else { %>
+  <div class="alert alert-warning text-center">
+    No Smart Recommendations Found! Try adding some listings to your wishlist or bookings.
+  </div>
+<% } %>
