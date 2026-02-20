@@ -3,6 +3,9 @@ const Review = require("../models/review.js");
 const ExpressError = require("../utils/ExpressError.js");
 const { listingSchema,reviewSchema } = require("../schema.js");
 
+
+//Middleware to check if user is logged in
+
 module.exports.isLoggedIn = (req, res, next) => {
     if (!req.isAuthenticated()) {
         req.session.redirectUrl = req.originalUrl;
