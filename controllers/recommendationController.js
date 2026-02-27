@@ -1,32 +1,70 @@
-const axios = require("axios"); //Import the Axios library for making HTTP requests
+/**********************************************************************
+ * CONTROLLERS/RECOMMENDATIONCONTROLLER.JS
+ 
+ * This controller handles AI-based smart recommendations.
+ *
+ * High-Level Flow:
+ * Browser → routes/recommendation.js → this controller
+ *        → Python AI service → recommendations → EJS view
+ 
+ * "This controller communicates with an external AI microservice
+ * to generate personalized recommendations for the logged-in user."
+ **********************************************************************/
 
-// Export the smartRecommend controller function
+const axios = require("axios"); // Used to call external AI API
+
+
+/**********************************************************************
+ * FUNCTION: smartRecommend
+ 
+ * Route: GET /smart
+ *
+ * Purpose:
+ * • Fetch personalized recommendations for the logged-in user
+ * • Call Python AI service
+ * • Render recommendation page
+ **********************************************************************/
 
 module.exports.smartRecommend = async (req, res) => {
   try {
-    const userId = req.user?._id;  //Get the currently logged-in user's ID using optional chaining
+    //  Safety check: if user is not logged in
+    // (Normally protected by isLoggedIn middleware)
+    if (!req.user) {
+      return res.render("recommendations/smart", {
+        recommendations: [],
+      });
+    }
 
-    //Send a POST request to the Flask backend server running at port 5001
-    // This backend will return personalized AI-based listing recommendations
+    //  Get current user ID from session
+    const userId = req.user._id;
 
-    const response = await axios.post("http://127.0.0.1:5001/smart-recommend", {
-      userId: userId, // Send userId in request body
-    });
+    /**************************************************************
+     * Call external AI service (Python backend)
+     *
+     * Flow:
+     * Node.js → axios POST → Python AI server → returns suggestions
+     **************************************************************/
+    const response = await axios.post(
+      process.env.AI_URL + "/smart-recommend",
+      { userId }
+    );
 
-    ////  Extract the recommendations from the backend response
-    // If no data is returned, fall back to an empty array
-
+    // Extract recommendations safely
     const recommendations = response.data.recommendations || [];
 
-   // Log the recommendations to the console for debugging purposes
+    // Debug log (useful during development)
+    console.log("AI Recommendations:", recommendations);
 
-    console.log(" AI Recommendations:", recommendations);
-
-    //Render the 'smart recommendations' EJS view and pass the recommendations data
-
+    //  Render recommendations page with AI data
     res.render("recommendations/smart", { recommendations });
+
   } catch (err) {
-    console.error(" AI Smart Recommendation Error:", err.message);
-    res.render("recommendations/smart", { recommendations: [] });  //Render the same view with an empty list to avoid crashing the page
+    //  If AI service fails, handle gracefully
+    console.error("AI Smart Recommendation Error:", err.message);
+
+    // Show empty recommendations instead of crashing app
+    res.render("recommendations/smart", {
+      recommendations: [],
+    });
   }
 };

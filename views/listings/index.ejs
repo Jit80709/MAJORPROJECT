@@ -1,7 +1,6 @@
 <% layout("/layouts/boilerplate") -%>
 
 <style>
-  /* FILTERS BAR */
   #filters {
     display: flex;
     flex-wrap: wrap;
@@ -31,8 +30,20 @@
     font-weight: bold;
     border-bottom: 2px solid black;
   }
+  .filter {
+    text-align: center;
+    opacity: 0.7;
+    font-size: 0.9rem;
+    text-decoration: none;
+    color: black;
+  }
 
-  /* TAX TOGGLE */
+
+
+
+
+
+
   .tax-toggle {
     border: 1px solid black;
     border-radius: 1rem;
@@ -43,7 +54,6 @@
     white-space: nowrap;
   }
 
-  /* LISTING GRID */
   .listings-container {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -97,35 +107,11 @@
     display: none;
     font-size: 0.8rem;
     color: #888;
-  }
 
-  /* Responsive tweaks */
-  @media (max-width: 768px) {
-    #filters {
-      justify-content: center;
-      gap: 1rem;
-      font-size: 0.85rem;
-    }
-
-    .tax-toggle {
-      margin: 1rem auto 0;
-    }
-
-    .listing-card img {
-      height: 180px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .listing-card img {
-      height: 160px;
-    }
-
-    .tax-toggle {
-      font-size: 0.8rem;
-      padding: 0.4rem 0.8rem;
-    }
-  }
+  }  
+  
+    
+  
 </style>
 
 <div id="filters">
@@ -146,7 +132,8 @@
   ]; %>
 
   <% categories.forEach(cat => { %>
-    <a href="/listings?category=<%= cat.name %><%= search ? '&search=' + search : '' %>" class="filter <%= category === cat.name ? 'active-filter' : '' %>">
+    <a href="/listings?category=<%= cat.name %><%= search ? '&search=' + search : '' %>"
+       class="filter <%= category === cat.name ? 'active-filter' : '' %>">
       <i class="fa-solid <%= cat.icon %>"></i>
       <p><%= cat.name %></p>
     </a>
@@ -159,7 +146,7 @@
   <% } %>
 
   <div class="tax-toggle">
-    <label for="switchCheckDefault">
+    <label>
       <input type="checkbox" id="switchCheckDefault" />
       &nbsp; Display total after taxes
     </label>
@@ -170,10 +157,13 @@
 <div class="listings-container">
   <% for (let listing of allListings) { %>
     <div class="listing-card">
-      <!-- Wishlist Heart -->
-      <form method="POST" action="/listings/<%= listing._id %>/wishlist" class="wishlist-form">
+
+      <!-- Wishlist -->
+      <form method="POST"
+            action="/listings/<%= listing._id %>/wishlist"
+            class="wishlist-form">
         <button type="submit" class="wishlist-btn">
-          <% if (currUser && currUser.wishlist && currUser.wishlist.includes(listing._id)) { %>
+          <% if (currUser && currUser.wishlist && currUser.wishlist.includes(listing._id.toString())) { %>
             <i class="fa-solid fa-heart text-danger"></i>
           <% } else { %>
             <i class="fa-regular fa-heart"></i>
@@ -181,17 +171,27 @@
         </button>
       </form>
 
-      <!-- Listing Card -->
       <a href="/listings/<%= listing._id %>" class="listing-link">
         <img src="<%= listing.image.url %>" alt="listing image" />
+
         <div class="card-body">
           <p class="card-text">
-            <b><%= listing.title %></b><br/>
+            <b><%= listing.title %></b>
+
+            <% if (Number(listing.avgRating) > 0) { %>
+              <span class="text-warning ms-2">
+                ⭐ <%= listing.avgRating %>
+              </span>
+            <% } %>
+
+            <br/>
+
             ₹<%= listing.price.toLocaleString("en-IN") %> / night
             <i class="tax-info"> +18% GST</i>
           </p>
         </div>
       </a>
+
     </div>
   <% } %>
 </div>
@@ -201,7 +201,8 @@
   taxSwitch.addEventListener("click", () => {
     let taxInfo = document.getElementsByClassName("tax-info");
     for (let info of taxInfo) {
-      info.style.display = (info.style.display !== "inline") ? "inline" : "none";
+      info.style.display =
+        (info.style.display !== "inline") ? "inline" : "none";
     }
   });
 </script>

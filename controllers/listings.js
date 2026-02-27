@@ -1,67 +1,148 @@
+/**********************************************************************
+ * CONTROLLERS/LISTINGS.JS
+ * ------------------------------------------------------------
+ * This file contains the business logic for all listing features.
+ *
+ * Flow:
+ * Route File → calls controller function
+ * Controller → interacts with Model (MongoDB)
+ * Model → performs DB operation
+ * Controller → sends response (render / redirect)
+
+ * "Controllers contain the main business logic of my application.
+ * They receive request data from routes, interact with models,
+ * and return the final response."
+ **********************************************************************/
+
 const Listing = require("../models/listing.js");
 const User = require("../models/user.js");
+const Booking = require("../models/booking.js");
+
+// Mapbox Geocoding setup (used while creating listing)
 const mbxGeocoding = require("@mapbox/mapbox-sdk/services/geocoding");
-const mapToken = process.env.MAP_TOKEN; //Mapbox Access Token from environment variable
+const mapToken = process.env.MAP_TOKEN;
 const geocodingClient = mbxGeocoding({ accessToken: mapToken });
 
-
-
-
+/* =====================================================
+   INDEX → Show all listings (with average rating)
+   Route: GET /listings
+===================================================== */
 module.exports.index = async (req, res) => {
+
+  // Get search & category from query
   const { category, search } = req.query;
   let filter = {};
 
-  // Filter by category if selected
+  // Filter by category
   if (category) {
     filter.category = category;
   }
 
-  // Search by location or country
+  // Filter by search keyword
   if (search) {
     filter.$or = [
       { location: { $regex: search, $options: "i" } },
-      { country: { $regex: search, $options: "i" } }
+      { country: { $regex: search, $options: "i" } },
     ];
   }
 
-  const allListings = await Listing.find(filter);
-  res.render("listings/index.ejs", { allListings, category, search });
+  // Fetch listings from DB & populate reviews
+  const listings = await Listing.find(filter).populate("reviews");
+
+  // Calculate average rating for each listing
+  const allListings = listings.map((listing) => {
+    let avgRating = 0;
+
+    if (listing.reviews && listing.reviews.length > 0) {
+      const total = listing.reviews.reduce((sum, review) => {
+        return sum + review.rating;
+      }, 0);
+
+      avgRating = (total / listing.reviews.length).toFixed(1);
+    }
+
+    return {
+      ...listing.toObject(),
+      avgRating,
+    };
+  });
+
+  // Render index page
+  res.render("listings/index.ejs", {
+    allListings,
+    category,
+    search,
+  });
 };
 
 
-
-
+/* =====================================================
+   RENDER NEW FORM
+   Route: GET /listings/new
+===================================================== */
 module.exports.renderNewForm = (req, res) => {
   res.render("listings/new.ejs");
 };
 
 
+/* =====================================================
+   SHOW SINGLE LISTING
+   Route: GET /listings/:id
+===================================================== */
 module.exports.showListing = async (req, res) => {
-    let { id } = req.params;
-    const listing = await Listing.findById(id)
-      .populate({
-          path: "reviews",
-          populate: {
-              path: "author",
 
-          },
-      })
-      .populate("owner");
-      if (!listing) {
-        req.flash("error", "Listing you requested for does not exist!");
-       res.redirect("/listings");
+  let { id } = req.params;
 
-      }
-    console.log(listing);
-    res.render("listings/show.ejs", {listing});
+  // Find listing by ID & populate related data
+  const listing = await Listing.findById(id)
+    .populate({
+      path: "reviews",
+      populate: { path: "author" },
+    })
+    .populate("owner");
 
-    
-}; 
+  // If listing not found
+  if (!listing) {
+    req.flash("error", "Listing does not exist!");
+    return res.redirect("/listings");
+  }
+
+  // Get bookings for this listing
+  const bookings = await Booking.find({ listing: listing._id });
+
+  // Convert bookings into date ranges
+  const bookedRanges = bookings.map((b) => ({
+    from: b.checkIn,
+    to: b.checkOut,
+  }));
+
+  // Calculate average rating
+  let avgRating = 0;
+
+  if (listing.reviews && listing.reviews.length > 0) {
+    const total = listing.reviews.reduce((sum, review) => {
+      return sum + review.rating;
+    }, 0);
+
+    avgRating = (total / listing.reviews.length).toFixed(1);
+  }
+
+  // Render show page
+  res.render("listings/show.ejs", {
+    listing,
+    bookedRanges,
+    avgRating,
+  });
+};
 
 
+/* =====================================================
+   CREATE LISTING
+   Route: POST /listings
+===================================================== */
+module.exports.createListing = async (req, res) => {
 
-
-module.exports.createListing = async (req, res, next) => {
+  // Convert location into coordinates using Mapbox
   const response = await geocodingClient
     .forwardGeocode({
       query: req.body.listing.location,
@@ -69,82 +150,117 @@ module.exports.createListing = async (req, res, next) => {
     })
     .send();
 
-    const url = req.file.path;
-    const filename = req.file.filename;
+  // Image info from multer (Cloudinary)
+  const url = req.file.path;
+  const filename = req.file.filename;
 
-    const newListing = new Listing(req.body.listing);
-    newListing.owner = req.user._id;
-    newListing.image = { url, filename };
+  // Create new listing object
+  const newListing = new Listing(req.body.listing);
 
-    // Ensure the entire geometry object from the API is saved
-    newListing.geometry  = response.body.features[0].geometry; // This line is correct and should work
+  // Set owner
+  newListing.owner = req.user._id;
 
-    let savedListing = await newListing.save();
-    console.log(savedListing);
-    req.flash("success","New Listing Created!");
-    res.redirect("/listings");
+  // Save image details
+  newListing.image = { url, filename };
+
+  // Save map coordinates
+  newListing.geometry = response.body.features[0].geometry;
+
+  // Save to MongoDB
+  await newListing.save();
+
+  req.flash("success", "New Listing Created!");
+  res.redirect("/listings");
 };
 
 
-
-
-
-
+/* =====================================================
+   RENDER EDIT FORM
+   Route: GET /listings/:id/edit
+===================================================== */
 module.exports.renderEditForm = async (req, res) => {
-    let { id } = req.params;
-    const listing = await Listing.findById(id);
-    if(!listing) {
-      req.flash("error", "Listing you requested for does not exist");
-      return res.redirect("/listings");
-    }
 
-    let originalImageUrl = listing.image.url;
-    originalImageUrl = originalImageUrl.replace("/upload","/upload/w_250"); // Use resized image for faster loading
-    res.render("listings/edit.ejs", { listing, originalImageUrl });
+  let { id } = req.params;
+
+  const listing = await Listing.findById(id);
+
+  if (!listing) {
+    req.flash("error", "Listing does not exist");
+    return res.redirect("/listings");
+  }
+
+  // Resize image preview
+  let originalImageUrl = listing.image.url;
+  originalImageUrl = originalImageUrl.replace("/upload", "/upload/w_250");
+
+  res.render("listings/edit.ejs", { listing, originalImageUrl });
 };
 
 
+/* =====================================================
+   UPDATE LISTING
+   Route: PUT /listings/:id
+===================================================== */
 module.exports.updateListing = async (req, res) => {
-    let { id } = req.params;
-    let listing = await Listing.findByIdAndUpdate(id, { ...req.body.listing });
 
-    if(typeof req.file !=="undefined") {   // If a new image was uploaded, update image
+  let { id } = req.params;
+
+  // Update listing details
+  let listing = await Listing.findByIdAndUpdate(id, {
+    ...req.body.listing,
+  });
+
+  // If new image uploaded
+  if (typeof req.file !== "undefined") {
     const url = req.file.path;
     const filename = req.file.filename;
     listing.image = { url, filename };
     await listing.save();
-    }
+  }
 
-
-    req.flash("success","Listing Updated!");
-    res.redirect(`/listings/${id}`);
-};  
-
-module.exports.destroyListing = async (req, res) => {
-    let { id } = req.params;
-    let deletedListing = await Listing.findByIdAndDelete(id);
-    console.log(deletedListing);
-    req.flash("success","Listing Deleted!");
-    res.redirect("/listings");
+  req.flash("success", "Listing Updated!");
+  res.redirect(`/listings/${id}`);
 };
 
+
+/* =====================================================
+   DELETE LISTING
+   Route: DELETE /listings/:id
+===================================================== */
+module.exports.destroyListing = async (req, res) => {
+
+  let { id } = req.params;
+
+  // Delete listing from DB
+  await Listing.findByIdAndDelete(id);
+
+  req.flash("success", "Listing Deleted!");
+  res.redirect("/listings");
+};
+
+
+/* =====================================================
+   TOGGLE WISHLIST
+   Route: POST /listings/:id/wishlist
+===================================================== */
 module.exports.toggleWishlist = async (req, res) => {
+
   const { id } = req.params;
   const user = req.user;
 
+  // Check if listing already in wishlist
   const index = user.wishlist.indexOf(id);
 
   if (index > -1) {
-    // Already in wishlist, remove it
+    // Remove from wishlist
     user.wishlist.splice(index, 1);
   } else {
-    // Not in wishlist, add it
+    // Add to wishlist
     user.wishlist.push(id);
   }
 
+  // Save user update
   await user.save();
 
-  // ✅ Proper redirect (safe and reliable)
   res.redirect(req.get("Referer") || `/listings/${id}`);
 };
-
