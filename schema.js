@@ -14,57 +14,41 @@
 
 const Joi = require("joi");
 
-
-/**********************************************************************
- * LISTING VALIDATION SCHEMA*
- * Validates listing form data before saving.
- **********************************************************************/
 module.exports.listingSchema = Joi.object({
-    listing: Joi.object({
+  listing: Joi.object({
 
-        // Title must be string and required
-        title: Joi.string().required(),
+    // Title must be string and required
+    title: Joi.string().required(),
 
-        // Description required
-        description: Joi.string().required(),
+    // Description required
+    description: Joi.string().required(),
 
-        // Location required
-        location: Joi.string().required(),
+    // Location required
+    location: Joi.string().required(),
 
-        // Country required
-        country: Joi.string().required(),
+    // Country required
+    country: Joi.string().required(),
 
-        // Price must be number ≥ 0
-        price: Joi.number().required().min(0),
+    // Price must be number ≥ 0
+    price: Joi.number().required().min(0),
 
-        // Image is optional
-        image: Joi.string().allow("", null),
+    //  IMPORTANT FIX — multer file safe
+    image: Joi.any(),
 
-        // Category must match predefined values
-        category: Joi.string()
-            .valid(
-                "Beach", "Mountains", "Trending", "Iconic Cities", "Rooms", "Castles",
-                "Arctic", "Luxe", "Farms", "Camping", "Boats", "Domes", "Tree House"
-            )
-            .required()
+    // Category validation
+    category: Joi.string()
+      .valid(
+        "Beach", "Mountains", "Trending", "Iconic Cities", "Rooms", "Castles",
+        "Arctic", "Luxe", "Farms", "Camping", "Boats", "Domes", "Tree House"
+      )
+      .required()
 
-    }).required(),
+  }).required(),
 });
 
-
-/**********************************************************************
- * REVIEW VALIDATION SCHEMA
- 
- * Validates review form data before saving.
- **********************************************************************/
 module.exports.reviewSchema = Joi.object({
-    review: Joi.object({
-
-        // Rating between 1 and 5
-        rating: Joi.number().required().min(1).max(5),
-
-        // Comment required
-        comment: Joi.string().required(),
-
-    }).required(),
+  review: Joi.object({
+    rating: Joi.number().required().min(1).max(5),
+    comment: Joi.string().required(),
+  }).required(),
 });
