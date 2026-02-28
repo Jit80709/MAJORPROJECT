@@ -140,37 +140,65 @@ module.exports.showListing = async (req, res) => {
    CREATE LISTING
    Route: POST /listings
 ===================================================== */
-module.exports.createListing = async (req, res) => {
+/**
+ * CREATE LISTING CONTROLLER
 
-  // Convert location into coordinates using Mapbox
-  const response = await geocodingClient
-    .forwardGeocode({
-      query: req.body.listing.location,
-      limit: 1,
-    })
-    .send();
+ * Purpose:
+ * Creates a new property listing with:
+ * - Mapbox geocoding (location → coordinates)
+ * - Image upload handling (Cloudinary via multer)
+ * - Owner assignment
+ * - Error-safe production handling
+ 
+ * Form → Route → Controller → MongoDB → Redirect
+ */
+module.exports.createListing = async (req, res, next) => {
+  try {
+    //  Convert location text into coordinates using Mapbox
+    const geoResponse = await geocodingClient
+      .forwardGeocode({
+        query: req.body.listing.location,
+        limit: 1,
+      })
+      .send();
 
-  // Image info from multer (Cloudinary)
-  const url = req.file.path;
-  const filename = req.file.filename;
+    // Ensure image was uploaded (multer safety check)
+    if (!req.file) {
+      req.flash("error", "Please upload an image!");
+      return res.redirect("/listings/new");
+    }
 
-  // Create new listing object
-  const newListing = new Listing(req.body.listing);
+    // Extract uploaded image info
+    const url = req.file.path;
+    const filename = req.file.filename;
 
-  // Set owner
-  newListing.owner = req.user._id;
+    //  Create new listing from form data
+    const newListing = new Listing(req.body.listing);
 
-  // Save image details
-  newListing.image = { url, filename };
+    // Assign current logged-in user as owner
+    newListing.owner = req.user._id;
 
-  // Save map coordinates
-  newListing.geometry = response.body.features[0].geometry;
+    // Attach image metadata
+    newListing.image = { url, filename };
 
-  // Save to MongoDB
-  await newListing.save();
+    //  Safely attach geometry if Mapbox returned result
+    if (geoResponse.body.features.length > 0) {
+      newListing.geometry = geoResponse.body.features[0].geometry;
+    }
 
-  req.flash("success", "New Listing Created!");
-  res.redirect("/listings");
+    //  Save listing into MongoDB
+    await newListing.save();
+
+    //  Success feedback
+    req.flash("success", "New Listing Created!");
+    res.redirect("/listings");
+
+  } catch (err) {
+    //  Production-safe error handling
+    console.error("CREATE LISTING ERROR:", err);
+    req.flash("error", "Something went wrong while creating listing.");
+    res.redirect("/listings/new");
+  }
 };
 
 

@@ -90,18 +90,27 @@ module.exports.isOwner = async (req, res, next) => {
  * Uses Joi schema to validate incoming form data.
  * Prevents invalid data from entering database.
  **********************************************************************/
+/**********************************************************************
+ * VALIDATE LISTING DATA (PRODUCTION SAFE)
+ **********************************************************************/
 module.exports.validateListing = (req, res, next) => {
+  //  Safety: ensure listing exists in body
+  if (!req.body.listing) {
+    req.flash("error", "Invalid listing data.");
+    return res.redirect("/listings/new");
+  }
 
-    let { error } = listingSchema.validate(req.body);
+  const { error } = listingSchema.validate(req.body);
 
-    if (error) {
+  if (error) {
+    //  Instead of crashing, show user-friendly message
+    const errMsg = error.details.map((el) => el.message).join(",");
 
-        let errMsg = error.details.map((el) => el.message).join(",");
-        throw new ExpressError(400, errMsg);
+    req.flash("error", errMsg);
+    return res.redirect("/listings/new");
+  }
 
-    } else {
-        next();
-    }
+  next();
 };
 
 
