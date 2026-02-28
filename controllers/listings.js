@@ -181,9 +181,15 @@ module.exports.createListing = async (req, res, next) => {
     // Attach image metadata
     newListing.image = { url, filename };
 
-    //  Safely attach geometry if Mapbox returned result
+    // Safe geometry (VERY IMPORTANT)
     if (geoResponse.body.features.length > 0) {
       newListing.geometry = geoResponse.body.features[0].geometry;
+    } else {
+      // fallback coordinates (India center)
+      newListing.geometry = {
+        type: "Point",
+        coordinates: [77.2090, 28.6139],
+      };
     }
 
     //  Save listing into MongoDB
