@@ -49,7 +49,7 @@ module.exports.smartRecommend = async (req, res) => {
       { userId },
       {
         headers: { "Content-Type": "application/json" },
-        timeout: 10000,
+        timeout: 60000 // (60 sec)
       }
     );
 
