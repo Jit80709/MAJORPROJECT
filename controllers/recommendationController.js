@@ -46,8 +46,15 @@ module.exports.smartRecommend = async (req, res) => {
      **************************************************************/
     const response = await axios.post(
       process.env.AI_URL + "/smart-recommend",
-      { userId }
+      { userId },
+      {
+        headers: { "Content-Type": "application/json" },
+        timeout: 10000,
+      }
     );
+
+    console.log("AI URL:", process.env.AI_URL);
+    console.log("AI RESPONSE:", response.data);
 
     // Extract recommendations safely
     const recommendations = response.data.recommendations || [];
